@@ -1,1 +1,7 @@
-pandas scikit-learn prophet plotly streamlit numpy
+jupyter
+pandas
+scikit-learn
+prophet
+plotly
+streamlit
+numpy
