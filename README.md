@@ -8,7 +8,7 @@ pip install -r requirements.txt
 ```
 
 # Running the notebook
-To run the notebook, just type on the terminal
+To run the notebook, just type this command on the terminal
 ```sh
 jupyter run notebook.ipynb
 ```
