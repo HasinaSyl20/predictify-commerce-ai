@@ -15,7 +15,7 @@ All models, report and cleaned dataset will be in the **models/** folder
 
 
 # Running the notebook
-To run the notebook, just type on the terminal
+To run the notebook, just type this command on the terminal
 ```sh
 jupyter notebook
 ```
