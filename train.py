@@ -1,278 +1,383 @@
-import pandas as pd
-import numpy as np
+import os
 import pickle
+import warnings
 from datetime import datetime
-from sklearn.model_selection import train_test_split
+
+import numpy as np
+import pandas as pd
+from prophet import Prophet
 from sklearn.linear_model import LinearRegression
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
-from prophet import Prophet
-import warnings
-warnings.filterwarnings('ignore')
+
+warnings.filterwarnings("ignore")
 
 
 class SalesModelTrainer:
-    def __init__(self, products_path, sales_path):
+    def __init__(self, products_path: str, sales_path: str):
+
+        # file paths for the csv
         self.products_path = products_path
         self.sales_path = sales_path
-        self.sales = None
+
+        # dataframes
         self.products = None
+        self.sales = None
         self.df = None
-        
+
+        # models
+        self.lr_model = None
+        self.rf_model = None
+        self.prophet_models = {}
+
+    # load product and sales dataframe from the csv files
     def load_data(self):
-        """Charger les données"""
-        print("📥 Chargement des données...")
         self.products = pd.read_csv(self.products_path)
         self.sales = pd.read_csv(self.sales_path, parse_dates=["date"])
-        print(f"   ✓ {len(self.products)} produits")
-        print(f"   ✓ {len(self.sales)} transactions")
-        
+
+    # basic data cleaning and make the date to datetime for futher manipulation
     def clean_data(self):
-        """Nettoyer les données"""
-        print("\n🧹 Nettoyage...")
-        initial = len(self.sales)
-        
         self.sales = self.sales.dropna(subset=["product_id", "count", "unit_price"])
         self.sales = self.sales[self.sales["count"] > 0]
         self.sales["date"] = pd.to_datetime(self.sales["date"])
-        
-        print(f"   ✓ {initial - len(self.sales)} lignes supprimées")
-        
+
+    # extra features for analysis like 7 days and 30 days trends
     def prepare_features(self):
-        """Préparer les features pour l'entraînement"""
-        print("\n🔧 Préparation des features...")
         
-        # Agrégation par produit et date
+        # daily product sales
         daily = (
             self.sales.groupby(["product_id", "date"])["count"]
             .sum()
             .reset_index()
+            .sort_values(["product_id", "date"])
         )
-        
-        # Calculer les tendances par produit
-        daily = daily.sort_values(["product_id", "date"])
-        
-        # Tendances sur différentes fenêtres
+
+        # 7 days and 30 days trend features
         daily["trend_7d"] = (
             daily.groupby("product_id")["count"]
             .rolling(7, min_periods=1)
             .mean()
             .reset_index(level=0, drop=True)
         )
-        
         daily["trend_30d"] = (
             daily.groupby("product_id")["count"]
             .rolling(30, min_periods=1)
             .mean()
             .reset_index(level=0, drop=True)
         )
-        
-        # Features temporelles
+
+        # extra date features
         daily["day_of_week"] = daily["date"].dt.dayofweek
         daily["month"] = daily["date"].dt.month
         daily["is_weekend"] = daily["day_of_week"].isin([5, 6]).astype(int)
-        
-        # Fusionner avec produits
-        self.df = daily.merge(self.products, left_on="product_id", right_on="id", how="left")
-        
-        # Supprimer les lignes avec tendances NaN au début
-        self.df = self.df.dropna(subset=["trend_7d", "trend_30d"])
-        
-        print(f"   ✓ {len(self.df)} lignes préparées")
-        
-    def train_models(self):
-        """Entraîner les 3 modèles"""
-        print("\n🚀 Entraînement des modèles...")
-        
-        # Features pour ML
-        feature_cols = ["trend_7d", "trend_30d", "day_of_week", "month", "is_weekend"]
+
+        # merge metadata
+        self.df = daily.merge(
+            self.products.rename(columns={"id": "product_id"}),
+            on="product_id",
+            how="left",
+        )
+
+        # product date for further imporvement if needed :)
+        launch = (
+            self.sales.groupby("product_id")["date"]
+            .min()
+            .reset_index()
+            .rename(columns={"date": "launch_date"})
+        )
+        self.df = self.df.merge(launch, on="product_id", how="left")
+        self.df["product_age_days"] = (
+            self.df["date"] - self.df["launch_date"]
+        ).dt.days
+
+        # categories
+        self.df["category"] = self.df["category"].fillna("unknown")
+        self.df = pd.get_dummies(self.df, columns=["category"], prefix="cat")
+
+        # price bucket
+        self.df["price_bucket"] = pd.qcut(
+            self.df["unit_price"], q=5, duplicates="drop", labels=False
+        )
+        self.df = pd.get_dummies(self.df, columns=["price_bucket"], prefix="price")
+
+        # remove NaN from trends
+        self.df = self.df.dropna(subset=["trend_7d", "trend_30d", "product_age_days"])
+
+    # train model linear regression prediction
+    def train_linear_regression(self):
+        base_cols = [
+            "trend_7d",
+            "trend_30d",
+            "day_of_week",
+            "month",
+            "is_weekend",
+            "product_age_days",
+        ]
+        cat_cols = [c for c in self.df.columns if c.startswith(("cat_", "price_"))]
+        feature_cols = base_cols + cat_cols
+
         X = self.df[feature_cols].fillna(0)
         y = self.df["count"]
-        
-        # Split
-        X_train, X_test, y_train, y_test = train_test_split(
-            X, y, test_size=0.2, random_state=42, shuffle=False
+
+        # split (80% train)
+        split_idx = int(len(self.df) * 0.8)
+        X_train, X_test = X.iloc[:split_idx], X.iloc[split_idx:]
+        y_train, y_test = y.iloc[:split_idx], y.iloc[split_idx:]
+
+        # train
+        lr = LinearRegression()
+        lr.fit(X_train, y_train)
+        pred = lr.predict(X_test)
+
+        # metric
+        metrics = {
+            "mae": mean_absolute_error(y_test, pred),
+            "rmse": np.sqrt(mean_squared_error(y_test, pred)),
+            "r2": r2_score(y_test, pred),
+        }
+        print(
+            f"Regression linéaire: MAE={metrics['mae']:.2f} | RMSE={metrics['rmse']:.2f} | R²={metrics['r2']:.3f}"
         )
-        
-        results = {}
-        
-        # 1. Régression Linéaire
-        print("   [1/3] Régression Linéaire...", end=" ")
-        lr_model = LinearRegression()
-        lr_model.fit(X_train, y_train)
-        lr_pred = lr_model.predict(X_test)
-        
-        results["linear_regression"] = {
-            "model": lr_model,
-            "mae": mean_absolute_error(y_test, lr_pred),
-            "rmse": np.sqrt(mean_squared_error(y_test, lr_pred)),
-            "r2": r2_score(y_test, lr_pred)
-        }
-        print("✓")
-        
-        # 2. Random Forest
-        print("   [2/3] Random Forest...", end=" ")
-        rf_model = RandomForestRegressor(n_estimators=100, max_depth=10, random_state=42)
-        rf_model.fit(X_train, y_train)
-        rf_pred = rf_model.predict(X_test)
-        
-        results["random_forest"] = {
-            "model": rf_model,
-            "mae": mean_absolute_error(y_test, rf_pred),
-            "rmse": np.sqrt(mean_squared_error(y_test, rf_pred)),
-            "r2": r2_score(y_test, rf_pred),
-            "feature_importance": dict(zip(feature_cols, rf_model.feature_importances_))
-        }
-        print("✓")
-        
-        # 3. Prophet
-        print("   [3/3] Prophet...", end=" ")
-        prophet_df = self.df[["date", "count"]].rename(columns={"date": "ds", "count": "y"})
-        
-        train_size = int(len(prophet_df) * 0.8)
-        prophet_train = prophet_df[:train_size]
-        prophet_test = prophet_df[train_size:]
-        
-        prophet_model = Prophet(
-            daily_seasonality=True,
-            weekly_seasonality=True,
-            yearly_seasonality=False
+
+        self.lr_model = {"model": lr, "metrics": metrics, "features": feature_cols}
+        return metrics
+
+    # random forest model training
+    def train_random_forest(self):
+
+        base_cols = [
+            "trend_7d",
+            "trend_30d",
+            "day_of_week",
+            "month",
+            "is_weekend",
+            "product_age_days",
+        ]
+        cat_cols = [c for c in self.df.columns if c.startswith(("cat_", "price_"))]
+        feature_cols = base_cols + cat_cols
+
+        X = self.df[feature_cols].fillna(0)
+        y = self.df["count"]
+
+        # split (80% train)
+        split_idx = int(len(self.df) * 0.8)
+        X_train, X_test = X.iloc[:split_idx], X.iloc[split_idx:]
+        y_train, y_test = y.iloc[:split_idx], y.iloc[split_idx:]
+
+        # traing model
+        rf = RandomForestRegressor(
+            n_estimators=200,
+            max_depth=12,
+            min_samples_leaf=5,
+            random_state=42,
+            n_jobs=-1,
         )
-        prophet_model.fit(prophet_train)
-        
-        forecast = prophet_model.predict(prophet_test[["ds"]])
-        prophet_pred = forecast["yhat"].values
-        prophet_actual = prophet_test["y"].values
-        
-        results["prophet"] = {
-            "model": prophet_model,
-            "mae": mean_absolute_error(prophet_actual, prophet_pred),
-            "rmse": np.sqrt(mean_squared_error(prophet_actual, prophet_pred)),
-            "r2": r2_score(prophet_actual, prophet_pred)
+        rf.fit(X_train, y_train)
+        pred = rf.predict(X_test)
+
+        # metric
+        metrics = {
+            "mae": mean_absolute_error(y_test, pred),
+            "rmse": np.sqrt(mean_squared_error(y_test, pred)),
+            "r2": r2_score(y_test, pred),
         }
-        print("✓")
+        print(
+            f"Random Forest MAE={metrics['mae']:.2f} | RMSE={metrics['rmse']:.2f} | R²={metrics['r2']:.3f}"
+        )
+
+        self.rf_model = {"model": rf, "metrics": metrics, "features": feature_cols}
+        return metrics
+
+    # train and create prophet per product
+    def train_prophet_per_product(self, min_obs: int = 30):
+        prophet_metrics = {"mae": [], "rmse": [], "r2": []}
+        count_trained = 0
+
+        for pid in self.df["product_id"].unique():
+            prod = self.df[self.df["product_id"] == pid][["date", "count"]].copy()
+            
+            if len(prod) < min_obs:
+                continue
+
+            prod = prod.rename(columns={"date": "ds", "count": "y"})
+            
+            # temporal split
+            split = int(len(prod) * 0.8)
+            train_df = prod.iloc[:split]
+            test_df = prod.iloc[split:]
+
+            if len(test_df) == 0:
+                continue
+
+            try:
+                # train prophet model
+                m = Prophet(
+                    daily_seasonality=True,
+                    weekly_seasonality=True,
+                    yearly_seasonality=False,
+                    growth="flat",
+                    seasonality_mode="multiplicative",
+                )
+                m.fit(train_df)
+
+                # prediction
+                future = test_df[["ds"]].copy()
+                forecast = m.predict(future)
+                y_pred = forecast["yhat"].clip(lower=0).values
+                y_true = test_df["y"].values
+
+                # metric
+                prophet_metrics["mae"].append(mean_absolute_error(y_true, y_pred))
+                prophet_metrics["rmse"].append(
+                    np.sqrt(mean_squared_error(y_true, y_pred))
+                )
+                prophet_metrics["r2"].append(r2_score(y_true, y_pred))
+
+                self.prophet_models[pid] = m
+                count_trained += 1
+
+            except Exception:
+                # Ignorer les produits problématiques
+                continue
+
+        if count_trained == 0:
+            return {}
+
+        # mean metric
+        agg = {
+            "mae": np.mean(prophet_metrics["mae"]),
+            "rmse": np.mean(prophet_metrics["rmse"]),
+            "r2": np.mean(prophet_metrics["r2"]),
+            "trained": count_trained,
+        }
+        print(
+            f"Prophet MAE={agg['mae']:.2f} | RMSE={agg['rmse']:.2f} | R²={agg['r2']:.3f}"
+        )
+        return agg
+
+    # export models to file using pickling and unpickling technique with pickle
+    def save_models(self, lr_metrics, rf_metrics, prophet_agg):
+        # remove all previous data first
+        if os.path.exists("models"):
+            print("Nettoyage du dossier models/...")
+            import shutil
+            shutil.rmtree("models")
         
-        return results
-    
-    def save_models(self, results):
-        """Sauvegarder les modèles et rapport"""
-        print("\n💾 Sauvegarde...")
-        
-        import os
         os.makedirs("models", exist_ok=True)
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+        # Linear regression model with timestamp
+        lr_path = f"models/lr_global_{ts}.pkl"
+        with open(lr_path, "wb") as f:
+            pickle.dump(self.lr_model, f)
+        print(f"{lr_path}")
+
+        # Random Forest model with timestamp
+        rf_path = f"models/rf_global_{ts}.pkl"
+        with open(rf_path, "wb") as f:
+            pickle.dump(self.rf_model, f)
+        print(f"{rf_path}")
+
+        # prophet models (per product)
+        if self.prophet_models:
+            prophet_dir = f"models/prophet_{ts}"
+            os.makedirs(prophet_dir, exist_ok=True)
+            for pid, model in self.prophet_models.items():
+                with open(f"{prophet_dir}/{pid}.pkl", "wb") as f:
+                    pickle.dump(model, f)
         
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        
-        # Sauvegarder chaque modèle
-        for name, data in results.items():
-            model_path = f"models/{name}_{timestamp}.pkl"
-            with open(model_path, "wb") as f:
-                pickle.dump(data["model"], f)
-            print(f"   ✓ {name}")
-        
-        # Sauvegarder le dataset préparé
-        dataset_path = f"models/dataset_{timestamp}.csv"
+        # cleaned dataset
+        dataset_path = f"models/cleaned_dataset_{ts}.csv"
         self.df.to_csv(dataset_path, index=False)
-        print(f"   ✓ Dataset sauvegardé")
-        
-        return timestamp
-    
-    def generate_report(self, results, timestamp):
-        """Générer le rapport de comparaison"""
-        print("\n📋 Génération du rapport...")
-        
-        report_path = f"models/rapport_analyse_{timestamp}.txt"
-        
+        print(f"Dataset: {dataset_path}")
+
+        # training and analysis report
+        report_path = f"models/report_{ts}.txt"
         with open(report_path, "w", encoding="utf-8") as f:
-            f.write("=" * 70 + "\n")
-            f.write("RAPPORT D'ANALYSE PRÉDICTIVE - VENTES E-COMMERCE\n")
-            f.write("=" * 70 + "\n\n")
+            f.write(f"Date : {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
             
-            f.write(f"Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
-            
-            # Données
             f.write("-" * 70 + "\n")
-            f.write("1. DONNÉES\n")
-            f.write("-" * 70 + "\n\n")
-            f.write(f"Période: {self.sales['date'].min().date()} à {self.sales['date'].max().date()}\n")
-            f.write(f"Produits: {len(self.products)}\n")
-            f.write(f"Transactions: {len(self.sales):,}\n\n")
-            
-            # Performance
+            f.write("DONNÉES\n")
             f.write("-" * 70 + "\n")
-            f.write("2. PERFORMANCE DES MODÈLES\n")
+            f.write(f"Produits : {len(self.products)}\n")
+            f.write(f"Transactions : {len(self.sales):,}\n")
+            f.write(f"Période : {self.sales['date'].min().date()} → {self.sales['date'].max().date()}\n")
+            f.write(f"Dataset nettoyé : {len(self.df)} lignes\n\n")
+            
+            f.write("-" * 70 + "\n")
+            f.write("COMPARAISON DES MODÈLES\n")
             f.write("-" * 70 + "\n\n")
+            
             f.write(f"{'Modèle':<25} {'MAE':<12} {'RMSE':<12} {'R²':<10}\n")
             f.write("-" * 60 + "\n")
+            f.write(f"{'Régression Linéaire':<25} {lr_metrics['mae']:<12.2f} {lr_metrics['rmse']:<12.2f} {lr_metrics['r2']:<10.3f}\n")
+            f.write(f"{'Random Forest':<25} {rf_metrics['mae']:<12.2f} {rf_metrics['rmse']:<12.2f} {rf_metrics['r2']:<10.3f}\n")
             
-            model_names = {
-                "linear_regression": "Régression Linéaire",
-                "random_forest": "Random Forest",
-                "prophet": "Prophet"
-            }
+            if prophet_agg:
+                f.write(f"{'Prophet (moyenne)':<25} {prophet_agg['mae']:<12.2f} {prophet_agg['rmse']:<12.2f} {prophet_agg['r2']:<10.3f}\n")
             
-            best_model = None
-            best_mae = float('inf')
+            f.write("\n")
             
-            for key, name in model_names.items():
-                mae = results[key]["mae"]
-                rmse = results[key]["rmse"]
-                r2 = results[key]["r2"]
-                f.write(f"{name:<25} {mae:<12.2f} {rmse:<12.2f} {r2:<10.3f}\n")
-                
-                if mae < best_mae:
-                    best_mae = mae
-                    best_model = name
+            # top model
+            best_model = min(
+                [("Régression Linéaire", lr_metrics['mae']),
+                 ("Random Forest", rf_metrics['mae']),
+                 ("Prophet", prophet_agg.get('mae', float('inf')))],
+                key=lambda x: x[1]
+            )
+            f.write(f"Meilleur modèle (MAE): {best_model[0]}\n\n")
             
-            # Importance des features (Random Forest)
+            if prophet_agg:
+                f.write("-" * 70 + "\n")
+                f.write("PROPHET (PAR PRODUIT)\n")
+                f.write("-" * 70 + "\n")
+                f.write(f"Modèles entraînés : {prophet_agg.get('trained', 0)}\n")
+            
             f.write("\n" + "-" * 70 + "\n")
-            f.write("3. IMPORTANCE DES VARIABLES (Random Forest)\n")
-            f.write("-" * 70 + "\n\n")
+            f.write("FICHIERS GÉNÉRÉS\n")
+            f.write("-" * 70 + "\n")
+            f.write(f"Modèle LR : lr_global_{ts}.pkl\n")
+            f.write(f"Modèle RF : rf_global_{ts}.pkl\n")
+            if self.prophet_models:
+                f.write(f"Modèles Prophet : prophet_{ts}/ ({len(self.prophet_models)} fichiers)\n")
+            f.write(f"Dataset nettoyé : cleaned_dataset_{ts}.csv\n")
+            f.write(f"Rapport : report_{ts}.txt\n")
             
-            importance = results["random_forest"]["feature_importance"]
-            for feature, score in sorted(importance.items(), key=lambda x: x[1], reverse=True):
-                f.write(f"   {feature:<20}: {score:.3f}\n")
-            
-            # Recommandations
-            f.write("\n" + "-" * 70 + "\n")
-            f.write("4. RECOMMANDATIONS\n")
-            f.write("-" * 70 + "\n\n")
-            f.write(f"✓ Meilleur modèle: {best_model}\n")
-            f.write(f"✓ Utiliser ce modèle pour les prédictions de stock\n")
-            f.write(f"✓ Réentraîner mensuellement avec nouvelles données\n\n")
-            
-            f.write("=" * 70 + "\n")
+            f.write("\n" + "=" * 70 + "\n")
         
-        print(f"   ✓ {report_path}")
+        print(f"Rapport d'analyse: {report_path}")
+        return ts
+
+    # training pipeline
+    def run(self):
+        self.load_data()
+        self.clean_data()
+        self.prepare_features()
+        
+        lr_metrics = self.train_linear_regression()
+        rf_metrics = self.train_random_forest()
+        prophet_agg = self.train_prophet_per_product()
+        
+        self.save_models(lr_metrics, rf_metrics, prophet_agg)
+        
+        print("\n" + "=" * 70)
+        print("ENTRAÎNEMENT TERMINÉ - 3 MODÈLES")
+        print("=" * 70)
+        print(f"   • Régression Linéaire (global)")
+        print(f"   • Random Forest (global)")
+        print(f"   • Prophet ({len(self.prophet_models)} modèles par produit)")
+        print("\nLancez maintenant: streamlit run app.py\n")
 
 
 def main():
-    print("\n" + "=" * 70)
-    print("ENTRAÎNEMENT DES MODÈLES - VENTES E-COMMERCE")
-    print("=" * 70 + "\n")
-    
-    # Chemins
     PRODUCTS_PATH = "./data/products.csv"
     SALES_PATH = "./data/sales.csv"
-    
-    # Entraînement
+
     trainer = SalesModelTrainer(PRODUCTS_PATH, SALES_PATH)
-    
     try:
-        trainer.load_data()
-        trainer.clean_data()
-        trainer.prepare_features()
-        results = trainer.train_models()
-        timestamp = trainer.save_models(results)
-        trainer.generate_report(results, timestamp)
-        
-        print("\n" + "=" * 70)
-        print("✓ ENTRAÎNEMENT TERMINÉ")
-        print("=" * 70)
-        print("\n💡 Lancez maintenant: streamlit run streamlit_app.py\n")
-        
+        trainer.run()
     except Exception as e:
-        print(f"\n❌ ERREUR: {e}")
+        print(f"\nErreur: {e}")
         import traceback
         traceback.print_exc()
 

@@ -7,8 +7,21 @@ Several packages are required for the development or running the resulting app i
 pip install -r requirements.txt
 ```
 
+# Note
+We tried our best to explain and comment all codes in technical english, so we all will likely to see english everywhere except for the user interface app of the dashboard and the final doc report, which will be in french abviously.
+
+The script for regenerating models is also available in this repository.
+All models, report and cleaned dataset will be in the **models/** folder 
+
+
 # Running the notebook
 To run the notebook, just type this command on the terminal
 ```sh
-jupyter run notebook.ipynb
+jupyter notebook
+```
+
+Or to make it simple (train the model and run the streamlit app), we just do
+```sh
+python train.py
+streamlit run app.py
 ```
