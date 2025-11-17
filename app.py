@@ -285,9 +285,6 @@ def main():
                     # Barre de progression
                     score_pct = (row['trend_score'] / suggestions['trend_score'].max()) * 100
                     st.progress(score_pct / 100)
-                    
-                    if rank <= 3:
-                        st.success("⭐ Produit hautement recommandé pour promotion")
             
             # Graphique
             st.subheader("Visualisation des Suggestions")
