@@ -474,7 +474,7 @@ def main():
             st.subheader("Rapport d'Entraînement")
             st.text(report_content)
         else:
-            st.info("Aucun rapport disponible. Lancez `python train.py` pour générer le rapport.")
+            st.info("Aucun rapport disponible. Veuillez lancer `python train.py` pour générer le rapport.")
 
 
 if __name__ == "__main__":
