@@ -6,3 +6,9 @@ Several packages are required for the development or running the resulting app i
 ```sh
 pip install -r requirements.txt
 ```
+
+# Running the notebook
+To run the notebook, just type on the terminal
+```sh
+jupyter run notebook.ipynb
+```
