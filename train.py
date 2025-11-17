@@ -12,13 +12,13 @@ from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
 warnings.filterwarnings("ignore")
 
-
 class SalesModelTrainer:
     def __init__(self, products_path: str, sales_path: str):
 
         # file paths for the csv
         self.products_path = products_path
         self.sales_path = sales_path
+
 
         # dataframes
         self.products = None
