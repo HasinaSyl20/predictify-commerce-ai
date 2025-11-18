@@ -1,0 +1,123 @@
+[33mcommit f1949b97c52ac9602bda553bd12cc0e14dad740e[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mma-nouvelle-fonctionnalite[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m
+Merge: d36160f 2115e3c
+Author: Hasina Sylvin <161363197+HasinaSyl20@users.noreply.github.com>
+Date:   Tue Nov 18 16:24:18 2025 +0300
+
+    Merge pull request #5 from HasinaSyl20/refactor/ui-improvements
+    
+    refactor: improvement ui
+
+[33mcommit 2115e3c2de4a0a8cf1d052e87788978d39a0ec9e[m
+Author: Hasina Sylvin <161363197+HasinaSyl20@users.noreply.github.com>
+Date:   Tue Nov 18 16:20:26 2025 +0300
+
+    refactor: improvement ui
+
+[33mcommit d36160f7f7d42ca00d37fb94288adb86303e2e2d[m
+Author: rfleonardi <125865705+rfleonardi@users.noreply.github.com>
+Date:   Mon Nov 17 13:03:59 2025 +0300
+
+    chore: refactor dashboard
+
+[33mcommit 90c1a5ad588c47dca13daa4585cc9cabebca8ca4[m
+Merge: 14c9c6e 071de4b
+Author: Cyrilos <67919656+Cyrilos@users.noreply.github.com>
+Date:   Mon Nov 17 12:42:25 2025 +0300
+
+    Merge pull request #4 from HasinaSyl20/ma-nouvelle-fonctionnalite
+    
+    Améliorer la gestion des données manquantes dans train.py
+
+[33mcommit 071de4bc572963563ba6333eb712638e81218f39[m[33m ([m[1;31morigin/ma-nouvelle-fonctionnalite[m[33m)[m
+Author: Sandratra53 <sandratra53@gmail.com>
+Date:   Mon Nov 17 12:31:16 2025 +0100
+
+    Améliorer la gestion des données manquantes dans train.py
+
+[33mcommit 14c9c6e740784c69c1bde360110af751b3764125[m[33m ([m[1;32mmain[m[33m)[m
+Merge: b4a3b4c 1db5cb3
+Author: Cyrilos <67919656+Cyrilos@users.noreply.github.com>
+Date:   Mon Nov 17 10:31:27 2025 +0300
+
+    Merge pull request #3 from HasinaSyl20/mfc/feat/train_model
+    
+    Mfc/feat/train model
+
+[33mcommit 1db5cb31cd482d648418b374a6755056cfd6a810[m
+Merge: e218f26 b4a3b4c
+Author: Faniriniaiko Cyrilos <mampisandryfaniriniaikoc@gmail.com>
+Date:   Mon Nov 17 10:34:16 2025 -0800
+
+    fix: resolve conflict
+
+[33mcommit e218f263de8e5f6ebf9f67e7403ba1f93869faa6[m
+Author: Faniriniaiko Cyrilos <mampisandryfaniriniaikoc@gmail.com>
+Date:   Mon Nov 17 10:32:23 2025 -0800
+
+    feat: update readme and both the train.py and app.py file
+
+[33mcommit 7c1ddf10f5ce06c31acbb5ff8ca320882e768663[m
+Author: Faniriniaiko Cyrilos <mampisandryfaniriniaikoc@gmail.com>
+Date:   Mon Nov 17 07:32:49 2025 -0800
+
+    feat: edit readme md
+
+[33mcommit b4a3b4c285d1aec27ec1fef6ead073522c17607c[m
+Author: rfleonardi <125865705+rfleonardi@users.noreply.github.com>
+Date:   Mon Nov 17 08:54:34 2025 +0300
+
+    Clarify command to run the notebook
+
+[33mcommit c2f1abb3f1d8587605580097987c79aa5a150951[m
+Merge: 169cab0 7c1ddf1
+Author: Cyrilos <67919656+Cyrilos@users.noreply.github.com>
+Date:   Mon Nov 17 07:31:34 2025 +0300
+
+    Merge pull request #2 from HasinaSyl20/mfc/feat/train_model
+    
+    Mfc/feat/train model
+
+[33mcommit 69b2ae4c598ed5210e8f84e268e1e529dee45468[m
+Author: Faniriniaiko Cyrilos <mampisandryfaniriniaikoc@gmail.com>
+Date:   Sat Nov 15 17:29:16 2025 -0800
+
+    feat: first attempt with streamlit
+
+[33mcommit 9ea975de1911cf960209e53442021e8a8d01d5a8[m
+Author: Faniriniaiko Cyrilos <mampisandryfaniriniaikoc@gmail.com>
+Date:   Thu Nov 6 16:50:54 2025 -0800
+
+    feat: create project starting point
+
+[33mcommit 895a0a6a5f9395e61b2b54693a3ac592008df411[m
+Author: Faniriniaiko Cyrilos <mampisandryfaniriniaikoc@gmail.com>
+Date:   Thu Nov 6 16:48:43 2025 -0800
+
+    feat: add gitignore
+
+[33mcommit f958036c1ea6139f772179481e61513756c3f649[m
+Author: Faniriniaiko Cyrilos <mampisandryfaniriniaikoc@gmail.com>
+Date:   Thu Nov 6 16:36:46 2025 -0800
+
+    feat: fix and finalize project core dependenciies
+
+[33mcommit 1eeb95f4dd3d13b4544b8b61c486695e55cf7e0b[m
+Author: Faniriniaiko Cyrilos <mampisandryfaniriniaikoc@gmail.com>
+Date:   Thu Nov 6 16:22:07 2025 -0800
+
+    feat: add core dependencies
+
+[33mcommit 169cab0c4d3d4982d7aa6324114b894ab715db68[m
+Merge: 956f901 f958036
+Author: Cyrilos <67919656+Cyrilos@users.noreply.github.com>
+Date:   Thu Nov 6 16:34:06 2025 +0300
+
+    Merge pull request #1 from HasinaSyl20/mfc/feat/train_model
+    
+    Mfc/feat/train model
+
+[33mcommit 956f9013b96d6e0df4ad134f9b7aeeda46e8fc3b[m
+Author: Hasina Sylvin <161363197+HasinaSyl20@users.noreply.github.com>
+Date:   Tue Oct 21 11:49:01 2025 +0300
+
+    Initial commit
