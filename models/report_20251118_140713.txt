@@ -1,4 +1,4 @@
-Date : 2025-11-17 10:26:57
+Date : 2025-11-18 14:07:14
 
 ----------------------------------------------------------------------
 DONNÉES
@@ -28,10 +28,10 @@ Modèles entraînés : 15
 ----------------------------------------------------------------------
 FICHIERS GÉNÉRÉS
 ----------------------------------------------------------------------
-Modèle LR : lr_global_20251117_102657.pkl
-Modèle RF : rf_global_20251117_102657.pkl
-Modèles Prophet : prophet_20251117_102657/ (15 fichiers)
-Dataset nettoyé : cleaned_dataset_20251117_102657.csv
-Rapport : report_20251117_102657.txt
+Modèle LR : lr_global_20251118_140713.pkl
+Modèle RF : rf_global_20251118_140713.pkl
+Modèles Prophet : prophet_20251118_140713/ (15 fichiers)
+Dataset nettoyé : cleaned_dataset_20251118_140713.csv
+Rapport : report_20251118_140713.txt
 
 ======================================================================
