@@ -41,7 +41,7 @@ def load_data(products_file, sales_file):
         products = pd.read_csv(products_file)
         sales = pd.read_csv(sales_file, parse_dates=["date"])
     except Exception as e:
-        st.error(f"Erreur de lecture CSV : {e}")
+        st.error(f"Erreur de lecture de CSV : {e}")
         return None, None
 
     # basic data cleaning
@@ -147,7 +147,7 @@ def main():
     )
     
     st.title("Recommendation de produits selon la tendance")
-    st.markdown("### Prédictions avec 3 modèles: LR + RF + Prophet")
+    st.markdown("### Prédictions avec les 3 modèles: LR + RF + Prophet")
     
     # sidemenu
     st.sidebar.header("Importer les fichiers csv")
